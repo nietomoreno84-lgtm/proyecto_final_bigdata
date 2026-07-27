@@ -1,0 +1,55 @@
+# ==== Entornos virtuales ====
+.venv/
+venv/
+env/
+ENV/
+
+# ==== Bytecode y cachés de Python ====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ==== Distribución / empaquetado ====
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ==== Variables de entorno y credenciales ====
+.env
+.env.*
+*.pem
+*.key
+
+# ==== Jupyter Notebook ====
+.ipynb_checkpoints/
+
+# ==== Testing / cobertura ====
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ==== Linters / type checkers ====
+.mypy_cache/
+.ruff_cache/
+
+# ==== Logs ====
+*.log
+
+# ==== Archivos del sistema operativo ====
+.DS_Store
+Thumbs.db
+
+# ==== Editores / IDE ====
+.vscode/
+.idea/
+*.swp
+
+# ==== Datos generados (ajusta a tu proyecto) ====
+# Si tus CSV/Excel de salida se regeneran con el script,
+# no hace falta versionarlos — pero si son datos originales
+# que quieres compartir en el repo, quita estas líneas.
+# data/*.csv
+# data/*.xlsx

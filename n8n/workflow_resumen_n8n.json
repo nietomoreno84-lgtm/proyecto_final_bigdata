@@ -1,0 +1,107 @@
+{
+  "name": "Resumen diario - Videojuego Seed42",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Resumen_diario_videojuegoSeed42",
+        "options": {}
+      },
+      "id": "07a18f77-1208-4785-993c-1523b6e7b7ae",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -80
+      ],
+      "webhookId": "resumen-videojuego-seed42"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b902085-c9d6-4bc3-ad62-8dc55617838c",
+              "name": "mensaje",
+              "value": "=🎮 RESUMEN DIARIO — VIDEOJUEGO SEED42 🎮\n\n📅 Fecha: {{ $json.body.fecha }}\n🕹️ Total partidas: {{ $json.body.total_partidas }}\n⭐ Puntos medios: {{ $json.body.puntos_medios }}\n🏆 Puntos máximos: {{ $json.body.puntos_maximos }}\n⚔️ K/D medio: {{ $json.body.kd_medio }}\n\n🗺️ Mapa más jugado: {{ $json.body.mapa_favorito }} ({{ $json.body.partidas_mapa_favorito }} partidas)\n✅ % Victorias: {{ $json.body.pct_victorias }}%\n👑 Jugador top: {{ $json.body.jugador_top }} ({{ $json.body.puntos_jugador_top }} pts)\n\n📌 Conclusiones:\n{{ $json.body.conclusiones.join('\\n- ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0c2bb63c-1e42-443a-9388-e42dbe20a05a",
+      "name": "Formatear mensaje",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7036048095",
+        "text": "={{ $json.mensaje }}",
+        "additionalFields": {
+          "appendAttribution": "={{ false }}"
+        }
+      },
+      "id": "3606b9ff-4e63-4585-af46-891780a20c93",
+      "name": "Enviar Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        -80
+      ],
+      "webhookId": "fbe6e334-e272-4f46-bb22-86904666ca49",
+      "credentials": {
+        "telegramApi": {
+          "id": "HMYjicmHwGF3clc7",
+          "name": "papito_bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Formatear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear mensaje": {
+      "main": [
+        [
+          {
+            "node": "Enviar Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "fd32b758-807a-4262-b391-036ed8cc4e70",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "16ba0fadc574ed8a5fca25b4a8cbcf4622f1f96fca84be1a1f01a0b74aa81576"
+  },
+  "nodeGroups": [],
+  "id": "Y7GSKiQv2Z26WlLz",
+  "tags": []
+}
