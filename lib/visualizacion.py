@@ -267,20 +267,34 @@ def grafico_reparto_modos(df: pd.DataFrame, ruta_salida: str):
 
 def grafico_duracion_vs_puntos(df: pd.DataFrame, ruta_salida: str):
     """
-    Relación entre duración de la partida y puntos conseguidos, en un panel
-    separado por modo (cada panel con su propio eje X, para que 'Torneo'
-    —con muchas menos partidas— no quede aplastado junto a los otros dos).
-    Los puntos van semitransparentes para intuir dónde se concentran más.
+    Puntos medios según la duración de la partida, agrupando en tramos de
+    5 minutos y con una línea por modo.
+
+    Se sustituyó el scatter original (nube de puntos poco legible, porque
+    'duracion_min' es un valor entero y los puntos se apilaban en columnas
+    verticales) por esta agregación. Al comprobar la correlación real entre
+    duración y puntos (~0 en los tres modos, prácticamente nula), una línea
+    de tendencia comunica mejor la conclusión de un vistazo: la duración de
+    una partida no influye en la puntuación conseguida.
     """
-    fig = px.scatter(
-        df, x="duracion_min", y="puntos", facet_col="modo", color="modo",
-        opacity=0.3, category_orders={"modo": ["Ranked", "Casual", "Torneo"]},
-        title="Relación entre duración de la partida y puntos, por modo",
+    datos = df.dropna(subset=["duracion_min", "puntos", "modo"]).copy()
+    datos["tramo_duracion"] = (datos["duracion_min"] // 5 * 5).astype(int)
+
+    resumen = (
+        datos.groupby(["modo", "tramo_duracion"])["puntos"]
+        .mean()
+        .reset_index()
+        .sort_values("tramo_duracion")
     )
-    fig.update_xaxes(matches=None, title="Duración (min)")
-    fig.update_yaxes(title="Puntos")
-    fig.update_layout(showlegend=False)
-    fig.for_each_annotation(lambda a: a.update(text=a.text.replace("modo=", "")))
+
+    fig = px.line(
+        resumen, x="tramo_duracion", y="puntos", color="modo", markers=True,
+        category_orders={"modo": ["Ranked", "Casual", "Torneo"]},
+        title="Puntos medios por tramo de duración (5 min), por modo",
+    )
+    fig.update_xaxes(title="Duración (min, inicio del tramo de 5 min)")
+    fig.update_yaxes(title="Puntos medios")
+    fig.update_layout(legend_title_text="Modo")
     fig.write_html(ruta_salida)
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
