@@ -11,7 +11,8 @@
 # ipykernel en tu entorno virtual (pip install ipykernel).
 
 # %%
-from lib.carga_mysql import obtener_conexion, CONFIG_BD
+from lib.carga_mysql import obtener_conexion
+from lib.configuracion import CONFIG_BD
 from lib.visualizacion import (
     consultar_partidas_completas,
     grafico_evolucion_temporal,

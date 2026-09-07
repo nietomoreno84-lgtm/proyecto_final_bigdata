@@ -19,6 +19,7 @@ dist/
 # ==== Variables de entorno y credenciales ====
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 
@@ -53,3 +54,11 @@ Thumbs.db
 # que quieres compartir en el repo, quita estas líneas.
 # data/*.csv
 # data/*.xlsx
+
+# ==== Salidas regenerables ====
+graficos/*.html
+data/partidas_limpio.csv
+data/jugadores_limpio.csv
+
+# Mantiene la carpeta de gráficos en Git sin subir los HTML generados.
+!graficos/.gitkeep

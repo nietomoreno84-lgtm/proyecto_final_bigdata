@@ -14,7 +14,8 @@ import os
 import pandas as pd
 import plotly.express as px
 
-from lib.carga_mysql import obtener_conexion, CONFIG_BD
+from lib.carga_mysql import obtener_conexion
+from lib.configuracion import CONFIG_BD
 from lib.resumen import registrar
 
 
@@ -47,7 +48,8 @@ def consultar_partidas_completas(conexion) -> pd.DataFrame:
 
 def consultar_ranking_jugadores(conexion, limite: int = 10) -> pd.DataFrame:
     """Top jugadores por puntos totales acumulados, con su región, rango y K/D medio."""
-    sql = f"""
+    limite = max(1, int(limite))
+    sql = """
         SELECT j.nick, j.region, j.rango,
                COUNT(p.id_partida) AS partidas_jugadas,
                SUM(p.puntos)       AS puntos_totales,
@@ -56,10 +58,10 @@ def consultar_ranking_jugadores(conexion, limite: int = 10) -> pd.DataFrame:
         JOIN partidas p ON p.id_jugador = j.id_jugador
         GROUP BY j.id_jugador, j.nick, j.region, j.rango
         ORDER BY puntos_totales DESC
-        LIMIT {limite}
+        LIMIT %s
     """
     cursor = conexion.cursor()
-    cursor.execute(sql)
+    cursor.execute(sql, (limite,))
     columnas = [c[0] for c in cursor.description]
     df = pd.DataFrame(cursor.fetchall(), columns=columnas)
     cursor.close()
@@ -134,7 +136,7 @@ def grafico_evolucion_temporal(df: pd.DataFrame, ruta_salida: str):
         title="Evolución de partidas jugadas por día",
     )
     fig.update_layout(xaxis_title="Fecha", yaxis_title="Partidas jugadas")
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -156,7 +158,7 @@ def grafico_comparativa_mapas(df: pd.DataFrame, ruta_salida: str):
         title="Puntos medios por mapa",
     )
     fig.update_layout(xaxis_title="Mapa", yaxis_title="Puntos medios", showlegend=False)
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -176,7 +178,7 @@ def grafico_distribucion_kd(df: pd.DataFrame, ruta_salida: str):
         title="Distribución del ratio kills/muertes por modo de juego",
     )
     fig.update_layout(xaxis_title="Modo de juego", yaxis_title="K/D ratio", showlegend=False)
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -196,7 +198,7 @@ def grafico_top_jugadores(df_ranking: pd.DataFrame, ruta_salida: str):
         title="Top jugadores por puntos totales",
     )
     fig.update_layout(xaxis_title="Puntos totales", yaxis_title="Jugador")
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -209,7 +211,7 @@ def grafico_victorias_por_rango(df_victorias: pd.DataFrame, ruta_salida: str):
     )
     fig.update_traces(texttemplate="%{text}%", textposition="outside")
     fig.update_layout(xaxis_title="Rango", yaxis_title="% de victorias", showlegend=False)
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -233,7 +235,7 @@ def grafico_actividad_region_dia(df_actividad: pd.DataFrame, ruta_salida: str):
         title="Partidas jugadas por día de la semana y región",
     )
     fig.update_layout(xaxis_title="Día de la semana", yaxis_title="Partidas jugadas")
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -247,7 +249,7 @@ def grafico_personajes_mas_usados(conteo_personajes: pd.Series, ruta_salida: str
         title=f"Top {top} personajes más usados",
     )
     fig.update_layout(xaxis_title="Personaje", yaxis_title="Veces usado", showlegend=False)
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -260,7 +262,7 @@ def grafico_reparto_modos(df: pd.DataFrame, ruta_salida: str):
         por_modo, names="modo", values="total_partidas", hole=0.4,
         title="Reparto de partidas por modo de juego",
     )
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -295,7 +297,7 @@ def grafico_duracion_vs_puntos(df: pd.DataFrame, ruta_salida: str):
     fig.update_xaxes(title="Duración (min, inicio del tramo de 5 min)")
     fig.update_yaxes(title="Puntos medios")
     fig.update_layout(legend_title_text="Modo")
-    fig.write_html(ruta_salida)
+    fig.write_html(ruta_salida, include_plotlyjs="cdn")
     registrar("Paso 4 (extra)", f"Gráfico generado: {ruta_salida}")
     return fig
 
@@ -304,7 +306,10 @@ def grafico_duracion_vs_puntos(df: pd.DataFrame, ruta_salida: str):
 # Pipeline principal del Paso 4
 # ---------------------------------------------------------------------------
 
-def generar_visualizaciones(config: dict = CONFIG_BD, carpeta_salida: str = "graficos") -> list:
+def generar_visualizaciones(
+    config: dict = CONFIG_BD,
+    carpeta_salida: str | os.PathLike[str] = "graficos",
+) -> list:
     """
     Orquesta el Paso 4 completo: consulta MySQL, y genera los 9 gráficos
     HTML interactivos dentro de 'carpeta_salida' (los 3 mínimos del Paso 4
@@ -315,34 +320,83 @@ def generar_visualizaciones(config: dict = CONFIG_BD, carpeta_salida: str = "gra
     os.makedirs(carpeta_salida, exist_ok=True)
     conexion = obtener_conexion(config)
     figuras = []
+    try:
+        # La consulta principal se ejecuta una sola vez y se reutiliza.
+        df_partidas = consultar_partidas_completas(conexion)
 
-    # cada gráfico es independiente: (nombre, función que devuelve el fig)
-    tareas = [
-        ("evolucion_partidas.html", lambda: grafico_evolucion_temporal(
-            consultar_partidas_completas(conexion), os.path.join(carpeta_salida, "evolucion_partidas.html"))),
-        ("comparativa_mapas.html", lambda: grafico_comparativa_mapas(
-            consultar_partidas_completas(conexion), os.path.join(carpeta_salida, "comparativa_mapas.html"))),
-        ("distribucion_kd.html", lambda: grafico_distribucion_kd(
-            consultar_partidas_completas(conexion), os.path.join(carpeta_salida, "distribucion_kd.html"))),
-        ("top_jugadores.html", lambda: grafico_top_jugadores(
-            consultar_ranking_jugadores(conexion, limite=10), os.path.join(carpeta_salida, "top_jugadores.html"))),
-        ("victorias_por_rango.html", lambda: grafico_victorias_por_rango(
-            consultar_victorias_por_rango(conexion), os.path.join(carpeta_salida, "victorias_por_rango.html"))),
-        ("actividad_region_dia.html", lambda: grafico_actividad_region_dia(
-            consultar_actividad_region_dia(conexion), os.path.join(carpeta_salida, "actividad_region_dia.html"))),
-        ("personajes_mas_usados.html", lambda: grafico_personajes_mas_usados(
-            consultar_personajes_usados(conexion), os.path.join(carpeta_salida, "personajes_mas_usados.html"))),
-        ("reparto_modos.html", lambda: grafico_reparto_modos(
-            consultar_partidas_completas(conexion), os.path.join(carpeta_salida, "reparto_modos.html"))),
-        ("duracion_vs_puntos.html", lambda: grafico_duracion_vs_puntos(
-            consultar_partidas_completas(conexion), os.path.join(carpeta_salida, "duracion_vs_puntos.html"))),
-    ]
+        # Cada gráfico es independiente: un error no bloquea los restantes.
+        tareas = [
+            (
+                "evolucion_partidas.html",
+                lambda: grafico_evolucion_temporal(
+                    df_partidas,
+                    os.path.join(carpeta_salida, "evolucion_partidas.html"),
+                ),
+            ),
+            (
+                "comparativa_mapas.html",
+                lambda: grafico_comparativa_mapas(
+                    df_partidas,
+                    os.path.join(carpeta_salida, "comparativa_mapas.html"),
+                ),
+            ),
+            (
+                "distribucion_kd.html",
+                lambda: grafico_distribucion_kd(
+                    df_partidas,
+                    os.path.join(carpeta_salida, "distribucion_kd.html"),
+                ),
+            ),
+            (
+                "top_jugadores.html",
+                lambda: grafico_top_jugadores(
+                    consultar_ranking_jugadores(conexion, limite=10),
+                    os.path.join(carpeta_salida, "top_jugadores.html"),
+                ),
+            ),
+            (
+                "victorias_por_rango.html",
+                lambda: grafico_victorias_por_rango(
+                    consultar_victorias_por_rango(conexion),
+                    os.path.join(carpeta_salida, "victorias_por_rango.html"),
+                ),
+            ),
+            (
+                "actividad_region_dia.html",
+                lambda: grafico_actividad_region_dia(
+                    consultar_actividad_region_dia(conexion),
+                    os.path.join(carpeta_salida, "actividad_region_dia.html"),
+                ),
+            ),
+            (
+                "personajes_mas_usados.html",
+                lambda: grafico_personajes_mas_usados(
+                    consultar_personajes_usados(conexion),
+                    os.path.join(carpeta_salida, "personajes_mas_usados.html"),
+                ),
+            ),
+            (
+                "reparto_modos.html",
+                lambda: grafico_reparto_modos(
+                    df_partidas,
+                    os.path.join(carpeta_salida, "reparto_modos.html"),
+                ),
+            ),
+            (
+                "duracion_vs_puntos.html",
+                lambda: grafico_duracion_vs_puntos(
+                    df_partidas,
+                    os.path.join(carpeta_salida, "duracion_vs_puntos.html"),
+                ),
+            ),
+        ]
 
-    for nombre, tarea in tareas:
-        try:
-            figuras.append(tarea())
-        except Exception as error:
-            registrar("Paso 4", f"ERROR generando {nombre}: {error}")
+        for nombre, tarea in tareas:
+            try:
+                figuras.append(tarea())
+            except Exception as error:
+                registrar("Paso 4", f"ERROR generando {nombre}: {error}")
+    finally:
+        conexion.close()
 
-    conexion.close()
     return figuras
