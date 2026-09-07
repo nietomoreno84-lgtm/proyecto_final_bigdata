@@ -84,8 +84,14 @@ APELLIDOS = {
 
 
 def _separar_digitos(nick: str) -> tuple[str, str]:
-    """Separa el nick en su parte alfabética (y guiones) y el sufijo numérico final."""
-    coincidencia = re.match(r"^([a-zA-Z\-]+)(\d*)$", nick)
+    """Separa la parte alfabética del sufijo numérico sin inventar contenido."""
+    if pd.isna(nick):
+        return "", ""
+
+    nick_limpio = str(nick).strip()
+    coincidencia = re.fullmatch(r"([a-zA-Z\-]+)(\d*)", nick_limpio)
+    if coincidencia is None:
+        return nick_limpio.lower(), ""
     return coincidencia.group(1).lower(), coincidencia.group(2)
 
 
@@ -114,12 +120,13 @@ def separar_nick(nick: str) -> str:
     """
     Convierte un nick pegado (p.ej. 'amayamanuela') en 'Nombre Apellido'
     (p.ej. 'Manuela Amaya'), usando los diccionarios NOMBRES/APELLIDOS.
-    Cuando el nick original solo trae la mitad del dato (una inicial suelta,
-    un nombre sin apellido, o un apellido sin nombre), la mitad que falta se
-    rellena con una elección aleatoria del propio diccionario, para que el
-    resultado final sea siempre un nombre y apellido completos.
+    Solo separa el valor cuando existe evidencia suficiente. Si falta parte
+    del nombre, conserva la información disponible en vez de inventar datos.
     """
     alpha, _digitos = _separar_digitos(nick)
+
+    if not alpha:
+        return "Desconocido"
 
     if alpha in EXCEPCIONES_ORDEN:
         nombre, apellido = EXCEPCIONES_ORDEN[alpha]
@@ -133,9 +140,7 @@ def separar_nick(nick: str) -> str:
             nombre_fmt = " ".join(parte.title() for parte in nombre.split("-"))
             if resto:
                 return f"{nombre_fmt} {resto.title()}"
-            # nombre compuesto sin apellido (p.ej. 'jose-ignacio32'): se rellena
-            apellido_aleatorio = np.random.choice(sorted(APELLIDOS))
-            return f"{nombre_fmt} {apellido_aleatorio.title()}"
+            return nombre_fmt
 
     # busca un punto de corte donde ambos lados sean palabras conocidas.
     # se prefieren los cortes nombre+apellido o apellido+nombre (permiten
@@ -162,29 +167,15 @@ def separar_nick(nick: str) -> str:
         primero, segundo = candidatos_mismo_tipo[0]
         return f"{primero.title()} {segundo.title()}"
 
-    # solo inicial + apellido, o inicial + nombre completo: en vez de dejar la
-    # inicial suelta ('C. Gimenez', 'Anton B.'), se sustituye por un nombre o
-    # apellido elegido al azar de nuestro propio diccionario
+    # Solo inicial + apellido, o inicial + nombre completo: se conserva la
+    # inicial para no atribuir a la persona un dato que no aparece en origen.
     if len(alpha) >= 2 and alpha[1:] in APELLIDOS:
-        nombre_aleatorio = np.random.choice(sorted(NOMBRES))
-        return f"{nombre_aleatorio.title()} {alpha[1:].title()}"
+        return f"{alpha[0].upper()}. {alpha[1:].title()}"
     if len(alpha) >= 2 and alpha[1:] in NOMBRES:
-        apellido_aleatorio = np.random.choice(sorted(APELLIDOS))
-        return f"{alpha[1:].title()} {apellido_aleatorio.title()}"
+        return f"{alpha[1:].title()} {alpha[0].upper()}."
 
-    # palabra suelta (todo el nick es una sola palabra, sin segunda mitad):
-    # se identifica si es un nombre o un apellido, y se rellena lo que falta
-    if alpha in NOMBRES:
-        apellido_aleatorio = np.random.choice(sorted(APELLIDOS))
-        return f"{alpha.title()} {apellido_aleatorio.title()}"
-    if alpha in APELLIDOS:
-        nombre_aleatorio = np.random.choice(sorted(NOMBRES))
-        return f"{nombre_aleatorio.title()} {alpha.title()}"
-
-    # no se reconoce ninguna palabra: se trata como apellido y se le
-    # antepone un nombre al azar, en vez de dejarlo suelto sin completar
-    nombre_aleatorio = np.random.choice(sorted(NOMBRES))
-    return f"{nombre_aleatorio.title()} {alpha.title()}"
+    # Palabra suelta o no reconocida: se normaliza, pero no se completa.
+    return alpha.title()
 
 
 def normalizar_nick(df: pd.DataFrame, columna: str = "nick") -> pd.DataFrame:
@@ -341,14 +332,9 @@ def tratar_nulos_partidas(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def tratar_nulos_jugadores(df: pd.DataFrame) -> pd.DataFrame:
-    """'region' nula se rellena con una región elegida al azar entre las
-    que ya existen en el propio CSV (respetando sus proporciones reales),
-    para no perder la fila al agrupar por región más adelante."""
+    """Etiqueta las regiones ausentes sin atribuir una región inventada."""
     df = df.copy()
-    valores_existentes = df["region"].dropna()
-    nulos = df["region"].isna()
-    relleno = np.random.choice(valores_existentes, size=nulos.sum())
-    df.loc[nulos, "region"] = relleno
+    df["region"] = normalizar_texto(df["region"]).fillna("Desconocida")
     return df
 
 
@@ -386,10 +372,8 @@ def generar_columnas_derivadas_jugadores(df: pd.DataFrame) -> pd.DataFrame:
 
 def redondear_sin_decimales(df: pd.DataFrame, columnas: list[str]) -> pd.DataFrame:
     """
-    Redondea las columnas indicadas a 0 decimales (p.ej. kd_ratio
-    0.8571428571428571 -> 1). Se usa el tipo 'Int64' (con mayúscula) de
-    pandas, que admite nulos, para que no queden con un '.0' final al
-    guardarlas en CSV.
+    Redondea columnas que representan recuentos a 0 decimales. Se usa el
+    tipo 'Int64' de pandas, que admite nulos.
     """
     df = df.copy()
     for columna in columnas:
@@ -434,7 +418,8 @@ def limpiar_partidas(df_partidas: pd.DataFrame) -> pd.DataFrame:
     df = eliminar_duplicados(df, subset=["id_partida"], paso=paso)
     df = tratar_nulos_partidas(df)
     df = generar_columnas_derivadas_partidas(df)
-    df = redondear_sin_decimales(df, ["kills", "puntos", "kd_ratio"])
+    df = redondear_sin_decimales(df, ["kills", "puntos"])
+    df["kd_ratio"] = df["kd_ratio"].round(2).astype("Float64")
     return df
 
 
@@ -442,10 +427,6 @@ def limpiar_jugadores(df_jugadores: pd.DataFrame) -> pd.DataFrame:
     """Aplica el pipeline de limpieza a jugadores, en orden."""
     paso = "Paso 2 — jugadores"
     registrar(paso, "Limpiando jugadores...")
-    # semilla fija: separar_nick() y tratar_nulos_jugadores() usan números
-    # aleatorios (nombre/apellido de relleno, región de relleno). Con la
-    # semilla fija, cada ejecución de main.py da siempre el mismo resultado.
-    np.random.seed(42)
     df = df_jugadores.copy()
     df = normalizar_nick(df)
     df = eliminar_duplicados(df, subset=["id_jugador"], paso=paso)
